@@ -44,7 +44,7 @@ def form():
         submission = st.form_submit_button(label="Sign Up")
         if submission == True:
             data = [email, pwd, f_name, l_name,age, gender, skills, experience, exp, sear,location, company]
-            with open('D:/COLLEGE/YEAR V/SEM IX/MINOR PROJECT/proj/users.csv', 'w', encoding='UTF8', newline='') as f:
+            with open('users.csv', 'w', encoding='UTF8', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(data)
                 f.close()
