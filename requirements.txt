@@ -2,7 +2,6 @@ streamlit
 pandas
 streamlit_lottie
 requests
-warnings
 selenium
 bs4
 re
