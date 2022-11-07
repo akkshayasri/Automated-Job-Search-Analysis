@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 st.markdown("## Overview")
-df = pd.read_csv("D:\COLLEGE\YEAR V\SEM IX\MINOR PROJECT\proj\Data Analyst jobs in Kochi naukri.csv")
+df = pd.read_csv("Data Analyst jobs in Kochi naukri.csv")
 
 
 # kpi 1 
