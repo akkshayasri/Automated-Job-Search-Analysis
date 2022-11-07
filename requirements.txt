@@ -4,7 +4,6 @@ streamlit_lottie
 requests
 selenium
 bs4
-re
 numpy
 collections
 wordcloud
