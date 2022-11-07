@@ -9,7 +9,6 @@ wordcloud
 nltk
 matplotlib
 seaborn
-random
 time
 datetime
 pyresparser
