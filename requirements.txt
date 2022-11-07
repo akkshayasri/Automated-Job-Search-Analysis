@@ -12,7 +12,6 @@ seaborn
 datetime
 pyresparser
 pdfminer3
-io
 streamlit_tags
 pymysql
 PIL
