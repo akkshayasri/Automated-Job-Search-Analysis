@@ -16,7 +16,6 @@ streamlit_tags
 pymysql
 pafy
 plotly
-warnings
 spacy
 gensim
 os
