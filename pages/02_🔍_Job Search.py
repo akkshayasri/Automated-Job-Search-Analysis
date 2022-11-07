@@ -12,7 +12,8 @@ import csv
 import re
 
 st.set_page_config(page_title="Rise - Job Search", page_icon=":mag:", layout="wide")
-driver = webdriver.Chrome(executable_path="chromedriver.exe")
+#driver = webdriver.Chrome(executable_path="chromedriver.exe")
+driver = webdriver.Chrome(executable_path=r'path/to/chromedriver')
 
 
 
