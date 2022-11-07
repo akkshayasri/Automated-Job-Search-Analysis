@@ -5,7 +5,6 @@ requests
 selenium
 bs4
 numpy
-collections
 wordcloud
 nltk
 matplotlib
