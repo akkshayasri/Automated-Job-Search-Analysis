@@ -12,7 +12,7 @@ import csv
 import re
 
 st.set_page_config(page_title="Rise - Job Search", page_icon=":mag:", layout="wide")
-driver = webdriver.Chrome(executable_path="D:\COLLEGE\YEAR V\SEM IX\MINOR PROJECT\chromedriver.exe")
+driver = webdriver.Chrome(executable_path="chromedriver.exe")
 
 
 
