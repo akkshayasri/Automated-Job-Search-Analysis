@@ -19,3 +19,4 @@ plotly
 spacy
 gensim
 sklearn
+webdriver-manager
