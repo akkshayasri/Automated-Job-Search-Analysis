@@ -9,7 +9,6 @@ wordcloud
 nltk
 matplotlib
 seaborn
-base64
 random
 time
 datetime
