@@ -18,5 +18,4 @@ pafy
 plotly
 spacy
 gensim
-os
 sklearn
