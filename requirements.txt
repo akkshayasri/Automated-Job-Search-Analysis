@@ -26,3 +26,8 @@ pymysql
 PIL
 pafy
 plotly
+warnings
+spacy
+gensim
+os
+sklearn
