@@ -2,7 +2,6 @@ streamlit
 pandas
 streamlit_lottie
 requests
-mailbox
 queue
 warnings
 selenium
