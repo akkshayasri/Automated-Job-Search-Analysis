@@ -9,7 +9,6 @@ wordcloud
 nltk
 matplotlib
 seaborn
-time
 datetime
 pyresparser
 pdfminer3
