@@ -14,7 +14,6 @@ pyresparser
 pdfminer3
 streamlit_tags
 pymysql
-PIL
 pafy
 plotly
 warnings
