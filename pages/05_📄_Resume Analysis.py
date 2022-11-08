@@ -2,6 +2,8 @@ from streamlit_lottie import st_lottie
 import streamlit as st
 import pandas as pd
 import base64,random
+import nltk
+nltk.download(stopwords)
 import time,datetime
 from pyresparser import ResumeParser
 from pdfminer3.layout import LAParams, LTTextBox
