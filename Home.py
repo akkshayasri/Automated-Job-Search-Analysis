@@ -30,7 +30,7 @@ with st.container():
     st.title("rise.com - The perfect site for your perfect job")
     st.subheader("**R**eveal your **I**nner **S**trengths to **E**mployers")
     st.write("This site will help you find the most suitable job by aggregating from various job portals and improve your skillset as well")
-    st.write("[Register here >](https://www.naukri.com/mnjuser/homepage)")
+    #st.write("[Register here >](https://www.naukri.com/mnjuser/homepage)")
 
 #WHAT WE DO
 with st.container():
