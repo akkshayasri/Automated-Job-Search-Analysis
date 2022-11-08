@@ -82,16 +82,7 @@ def course_recommender(course_list):
             break
     return rec_course
 
-#connection = pymysql.connect(host='localhost',user='root',password='',db='sra')
-#cursor = connection.cursor()
 
-#def insert_data(name,email,res_score,timestamp,no_of_pages,reco_field,cand_level,skills,recommended_skills,courses):
- #   DB_table_name = 'user_data'
-  #  insert_sql = "insert into " + DB_table_name + """
-   # values (0,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
-    #rec_values = (name, email, str(res_score), timestamp,str(no_of_pages), reco_field, cand_level, skills,recommended_skills,courses)
-    #cursor.execute(insert_sql, rec_values)
-    #connection.commit()
 
 st.set_page_config(
    page_title="Resume Analyzer",
@@ -104,27 +95,7 @@ def run():
     choice = st.sidebar.selectbox("Choose among the given options:", activities)
     
 
-    # Create the DB
-    #db_sql = """CREATE DATABASE IF NOT EXISTS SRA;"""
-    #cursor.execute(db_sql)
-
-    # Create table
-    #DB_table_name = 'user_data'
-    #table_sql = "CREATE TABLE IF NOT EXISTS " + DB_table_name + """
-     #               (ID INT NOT NULL AUTO_INCREMENT,
-      #               Name varchar(100) NOT NULL,
-       #              Email_ID VARCHAR(50) NOT NULL,
-        #             resume_score VARCHAR(8) NOT NULL,
-         #            Timestamp VARCHAR(50) NOT NULL,
-          #           Page_no VARCHAR(5) NOT NULL,
-           ##          Predicted_Field VARCHAR(25) NOT NULL,
-             #        User_level VARCHAR(30) NOT NULL,
-              #       Actual_skills VARCHAR(300) NOT NULL,
-               #      Recommended_skills VARCHAR(300) NOT NULL,
-                #     Recommended_courses VARCHAR(600) NOT NULL,
-                 #    PRIMARY KEY (ID));
-                   # """
-    #cursor.execute(table_sql)
+   
     if choice == 'Normal User':
         # st.markdown('''<h4 style='text-align: left; color: #d73b5c;'>* Upload your resume, and get smart recommendation based on it."</h4>''',
         #             unsafe_allow_html=True)
@@ -256,15 +227,7 @@ def run():
                         rec_course = course_recommender(uiux_course)
                         break
 
-                #
-                ## Insert into table
-                #ts = time.time()
-                #cur_date = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
-                #cur_time = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
-                #timestamp = str(cur_date+'_'+cur_time)
-
-                ### Resume writing recommendation
-                #st.subheader("**Resume Tips & Ideas💡**")
+                
                 resume_score = 0
                 if 'Objective' in resume_text:
                     resume_score = resume_score+20
@@ -321,8 +284,6 @@ def run():
                 st.warning("** Note: This score is calculated based on the content that you have added in your Resume. **")
                 st.balloons()
 
-                #insert_data(resume_data['name'], resume_data['email'], str(resume_score), timestamp,
-                 #             str(resume_data['no_of_pages']), reco_field, cand_level, str(resume_data['skills']),
-                  #            str(recommended_skills), str(rec_course))
+               
         st_lottie(lottie_resume, height=1000, key="anime")
 run()
