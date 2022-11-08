@@ -5,7 +5,6 @@ import base64,random
 import nltk
 nltk.download('stopwords')
 import spacy
-nlp = spacy.load("en_core_web_sm")
 import time,datetime
 from pyresparser import ResumeParser
 from pdfminer3.layout import LAParams, LTTextBox
