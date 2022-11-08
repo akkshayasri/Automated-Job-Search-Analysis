@@ -1,370 +1,308 @@
-from streamlit_lottie import st_lottie
 import streamlit as st
 import pandas as pd
-import base64,random
-import time,datetime
-from pyresparser import ResumeParser
-from pdfminer3.layout import LAParams, LTTextBox
-from pdfminer3.pdfpage import PDFPage
-from pdfminer3.pdfinterp import PDFResourceManager
-from pdfminer3.pdfinterp import PDFPageInterpreter
-from pdfminer3.converter import TextConverter
-import io,random
-from streamlit_tags import st_tags
+import numpy as np
+import re
+import seaborn as sns
+import sklearn
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style("whitegrid")
+
+
+import warnings 
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
+import joblib
+
+from collections import Counter
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+import nltk
+import spacy
+import gensim
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+
+import re
+from os import path
 from PIL import Image
-import pymysql
-from Courses import ds_course,web_course,android_course,ios_course,uiux_course,resume_videos,interview_videos
-import pafy
-import plotly.express as px
-import requests
-
-def load_lottieurl(url):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-lottie_resume = load_lottieurl("https://assets7.lottiefiles.com/packages/lf20_4DLPlW.json")
-
-
-
-def fetch_yt_video(link):
-    video = pafy.new(link)
-    return video.title
-
-def get_table_download_link(df,filename,text):
-    """Generates a link allowing the data in a given panda dataframe to be downloaded
-    in:  dataframe
-    out: href string
-    """
-    csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()  # some strings <-> bytes conversions necessary here
-    # href = f'<a href="data:file/csv;base64,{b64}">Download Report</a>'
-    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">{text}</a>'
-    return href
-
-def pdf_reader(file):
-    resource_manager = PDFResourceManager()
-    fake_file_handle = io.StringIO()
-    converter = TextConverter(resource_manager, fake_file_handle, laparams=LAParams())
-    page_interpreter = PDFPageInterpreter(resource_manager, converter)
-    with open(file, 'rb') as fh:
-        for page in PDFPage.get_pages(fh,
-                                      caching=True,
-                                      check_extractable=True):
-            page_interpreter.process_page(page)
-            print(page)
-        text = fake_file_handle.getvalue()
-
-    # close open handles
-    converter.close()
-    fake_file_handle.close()
-    return text
-
-def show_pdf(file_path):
-    with open(file_path, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-    # pdf_display = f'<embed src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf">'
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
-    st.markdown(pdf_display, unsafe_allow_html=True)
-
-def course_recommender(course_list):
-    st.subheader("**Courses & Certificates🎓 Recommendations**")
-    c = 0
-    rec_course = []
-    no_of_reco = st.slider('Choose Number of Course Recommendations:', 1, 10, 4)
-    random.shuffle(course_list)
-    for c_name, c_link in course_list:
-        c += 1
-        st.markdown(f"({c}) [{c_name}]({c_link})")
-        rec_course.append(c_name)
-        if c == no_of_reco:
-            break
-    return rec_course
-
-connection = pymysql.connect(host='localhost',user='root',password='',db='sra')
-cursor = connection.cursor()
-
-def insert_data(name,email,res_score,timestamp,no_of_pages,reco_field,cand_level,skills,recommended_skills,courses):
-    DB_table_name = 'user_data'
-    insert_sql = "insert into " + DB_table_name + """
-    values (0,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
-    rec_values = (name, email, str(res_score), timestamp,str(no_of_pages), reco_field, cand_level, skills,recommended_skills,courses)
-    cursor.execute(insert_sql, rec_values)
-    connection.commit()
-
+import plotly
+from sklearn.feature_extraction.text import CountVectorizer
 st.set_page_config(
-   page_title="Resume Analyzer",
-   page_icon=':page_facing_up:',
+    page_title = 'Company Analysis Dashboard',
+    page_icon = 'chart_with_upwards_trend',
+    layout = 'wide'
 )
-def run():
-    st.title("Smart Resume Analyser")
-    st.sidebar.markdown("# Choose User")
-    activities = ["Normal User", "Admin"]
-    choice = st.sidebar.selectbox("Choose among the given options:", activities)
+
+company = st.selectbox('Select the company',('Honeywell', 'IBM', 'Microsoft', 'Oracle'))
+
+if company == "Honeywell":
+    df = pd.read_csv('company1_review.csv', index_col=[0], parse_dates=['Comment Datetime']) 
+elif company == "IBM":
+    df = pd.read_csv('IBM.csv', index_col=[0], parse_dates=['Comment Datetime'])
+elif company == "Microsoft":
+    df = pd.read_csv('Microsoft.csv', index_col=[0], parse_dates=['Comment Datetime'])
+else:
+    df = pd.read_csv('Oracle.csv', index_col=[0], parse_dates=['Comment Datetime'])
     
-
-    # Create the DB
-    db_sql = """CREATE DATABASE IF NOT EXISTS SRA;"""
-    cursor.execute(db_sql)
-
-    # Create table
-    DB_table_name = 'user_data'
-    table_sql = "CREATE TABLE IF NOT EXISTS " + DB_table_name + """
-                    (ID INT NOT NULL AUTO_INCREMENT,
-                     Name varchar(100) NOT NULL,
-                     Email_ID VARCHAR(50) NOT NULL,
-                     resume_score VARCHAR(8) NOT NULL,
-                     Timestamp VARCHAR(50) NOT NULL,
-                     Page_no VARCHAR(5) NOT NULL,
-                     Predicted_Field VARCHAR(25) NOT NULL,
-                     User_level VARCHAR(30) NOT NULL,
-                     Actual_skills VARCHAR(300) NOT NULL,
-                     Recommended_skills VARCHAR(300) NOT NULL,
-                     Recommended_courses VARCHAR(600) NOT NULL,
-                     PRIMARY KEY (ID));
-                    """
-    cursor.execute(table_sql)
-    if choice == 'Normal User':
-        # st.markdown('''<h4 style='text-align: left; color: #d73b5c;'>* Upload your resume, and get smart recommendation based on it."</h4>''',
-        #             unsafe_allow_html=True)
-        pdf_file = st.file_uploader("Choose your Resume", type=["pdf"])
-        if pdf_file is not None:
-            # with st.spinner('Uploading your Resume....'):
-            #     time.sleep(4)
-            save_image_path = './Uploaded_Resumes/'+pdf_file.name
-            with open(save_image_path, "wb") as f:
-                f.write(pdf_file.getbuffer())
-            show_pdf(save_image_path)
-            resume_data = ResumeParser(save_image_path).get_extracted_data()
-            if resume_data:
-                ## Get the whole resume data
-                resume_text = pdf_reader(save_image_path)
-
-                st.header("**Resume Analysis**")
-                st.success("Hello "+ resume_data['name'])
-                st.subheader("**Your Basic info**")
-                try:
-                    st.text('Name: '+resume_data['name'])
-                    st.text('Email: ' + resume_data['email'])
-                    st.text('Contact: ' + resume_data['mobile_number'])
-                    st.text('Resume pages: '+str(resume_data['no_of_pages']))
-                except:
-                    pass
-                cand_level = ''
-                if resume_data['no_of_pages'] == 1:
-                    cand_level = "Fresher"
-                    st.markdown( '''<h4 style='text-align: left; color: #d73b5c;'>You are looking like a Fresher.</h4>''',unsafe_allow_html=True)
-                elif resume_data['no_of_pages'] == 2:
-                    cand_level = "Intermediate"
-                    st.markdown('''<h4 style='text-align: left; color: #1ed760;'>You are at intermediate level!</h4>''',unsafe_allow_html=True)
-                elif resume_data['no_of_pages'] >=3:
-                    cand_level = "Experienced"
-                    st.markdown('''<h4 style='text-align: left; color: #fba171;'>You are at experience level!''',unsafe_allow_html=True)
-
-                st.subheader("**Skills Recommendation💡**")
-                ## Skill shows
-                keywords = st_tags(label='### Skills that you have',
-                text='See our skills recommendation',
-                    value=resume_data['skills'],key = '1')
-                
-                job = st.selectbox("Select the job you are looking for:",('Data Analyst','Business Analyst','Web Developement','Android Development','IOS Development','UI-UX Development'))
+    
+df.drop_duplicates(inplace = True)
+rating_columns = df.select_dtypes(include = ['float64'])
+string_columns = df.select_dtypes(exclude = ['float64'])
+df_column_sorted = pd.concat([string_columns, rating_columns], axis = 1)
 
 
-
-                ##  recommendation
-                ds_keyword = ['tensorflow','keras','pytorch','machine learning','deep Learning','flask','streamlit']
-                web_keyword = ['react', 'django', 'node jS', 'react js', 'laravel', 'magento', 'wordpress',
-                               'javascript', 'angular js', 'c#' ]
-                android_keyword = ['android','android development','flutter','kotlin','xml','kivy']
-                ios_keyword = ['ios','ios development','swift','cocoa','cocoa touch','xcode']
-                uiux_keyword = ['ux','adobe xd','figma','zeplin','balsamiq','ui','prototyping','wireframes','storyframes','adobe photoshop','photoshop','editing','adobe illustrator','illustrator','adobe after effects','after effects','adobe premier pro','premier pro','adobe indesign','indesign','wireframe','solid','grasp','user research','user experience']
-                ba_keyword = ['statistics', 'probability', 'programming skills', 'timeseries','communication','decision-making','data visualization','SQL']
-                recommended_skills = []
-                reco_field = ''
-                rec_course = ''
-                ## Courses recommendation
-                for i in resume_data['skills']:
-                    ## Business Analyst recommendation
-                    if i.lower() in ba_keyword:
-                        print(i.lower())
-                        reco_field = 'Business Analytics'
-                        st.success("** Our analysis says you are looking for Business Analyst Jobs.**")
-                        recommended_skills = ['Data Visualization','Predictive Analysis','Statistical Modeling','Data Mining','Clustering & Classification','Data Analytics','Quantitative Analysis','Web Scraping','ML Algorithms','Keras','Pytorch','Probability','Scikit-learn','Tensorflow',"Flask",'Streamlit']
-                        recommended_keywords = st_tags(label='### Recommended skills for you.',
-                        text='Recommended skills generated from System',value=recommended_skills,key = '2')
-                        st.markdown('''<h4 style='text-align: left; color: #1ed760;'>Adding this skills to resume will boost🚀 the chances of getting a Job💼</h4>''',unsafe_allow_html=True)
-                        rec_course = course_recommender(ds_course)
-                        break
-                    ## Data science recommendation
-                    if i.lower() in ds_keyword:
-                        print(i.lower())
-                        reco_field = 'Data Science'
-                        st.success("** Our analysis says you are looking for Data Science Jobs.**")
-                        recommended_skills = ['Data Visualization','Predictive Analysis','Statistical Modeling','Data Mining','Clustering & Classification','Data Analytics','Quantitative Analysis','Web Scraping','ML Algorithms','Keras','Pytorch','Probability','Scikit-learn','Tensorflow',"Flask",'Streamlit']
-                        recommended_keywords = st_tags(label='### Recommended skills for you.',
-                        text='Recommended skills generated from System',value=recommended_skills,key = '2')
-                        st.markdown('''<h4 style='text-align: left; color: #1ed760;'>Adding this skills to resume will boost🚀 the chances of getting a Job💼</h4>''',unsafe_allow_html=True)
-                        rec_course = course_recommender(ds_course)
-                        break
-
-                    ## Web development recommendation
-                    elif i.lower() in web_keyword:
-                        print(i.lower())
-                        reco_field = 'Web Development'
-                        st.success("** Our analysis says you are looking for Web Development Jobs **")
-                        recommended_skills = ['React','Django','Node JS','React JS','php','laravel','Magento','wordpress','Javascript','Angular JS','c#','Flask','SDK']
-                        recommended_keywords = st_tags(label='### Recommended skills for you.',
-                        text='Recommended skills generated from System',value=recommended_skills,key = '3')
-                        st.markdown('''<h4 style='text-align: left; color: #1ed760;'>Adding this skills to resume will boost🚀 the chances of getting a Job💼</h4>''',unsafe_allow_html=True)
-                        rec_course = course_recommender(web_course)
-                        break
-
-                    ## Android App Development
-                    elif i.lower() in android_keyword:
-                        print(i.lower())
-                        reco_field = 'Android Development'
-                        st.success("** Our analysis says you are looking for Android App Development Jobs **")
-                        recommended_skills = ['Android','Android development','Flutter','Kotlin','XML','Java','Kivy','GIT','SDK','SQLite']
-                        recommended_keywords = st_tags(label='### Recommended skills for you.',
-                        text='Recommended skills generated from System',value=recommended_skills,key = '4')
-                        st.markdown('''<h4 style='text-align: left; color: #1ed760;'>Adding this skills to resume will boost🚀 the chances of getting a Job💼</h4>''',unsafe_allow_html=True)
-                        rec_course = course_recommender(android_course)
-                        break
-
-                    ## IOS App Development
-                    elif i.lower() in ios_keyword:
-                        print(i.lower())
-                        reco_field = 'IOS Development'
-                        st.success("** Our analysis says you are looking for IOS App Development Jobs **")
-                        recommended_skills = ['IOS','IOS Development','Swift','Cocoa','Cocoa Touch','Xcode','Objective-C','SQLite','Plist','StoreKit',"UI-Kit",'AV Foundation','Auto-Layout']
-                        recommended_keywords = st_tags(label='### Recommended skills for you.',
-                        text='Recommended skills generated from System',value=recommended_skills,key = '5')
-                        st.markdown('''<h4 style='text-align: left; color: #1ed760;'>Adding this skills to resume will boost🚀 the chances of getting a Job💼</h4>''',unsafe_allow_html=True)
-                        rec_course = course_recommender(ios_course)
-                        break
-
-                    ## Ui-UX Recommendation
-                    elif i.lower() in uiux_keyword:
-                        print(i.lower())
-                        reco_field = 'UI-UX Development'
-                        st.success("** Our analysis says you are looking for UI-UX Development Jobs **")
-                        recommended_skills = ['UI','User Experience','Adobe XD','Figma','Zeplin','Balsamiq','Prototyping','Wireframes','Storyframes','Adobe Photoshop','Editing','Illustrator','After Effects','Premier Pro','Indesign','Wireframe','Solid','Grasp','User Research']
-                        recommended_keywords = st_tags(label='### Recommended skills for you.',
-                        text='Recommended skills generated from System',value=recommended_skills,key = '6')
-                        st.markdown('''<h4 style='text-align: left; color: #1ed760;'>Adding this skills to resume will boost🚀 the chances of getting a Job💼</h4>''',unsafe_allow_html=True)
-                        rec_course = course_recommender(uiux_course)
-                        break
-
-                #
-                ## Insert into table
-                ts = time.time()
-                cur_date = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
-                cur_time = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
-                timestamp = str(cur_date+'_'+cur_time)
-
-                ### Resume writing recommendation
-                #st.subheader("**Resume Tips & Ideas💡**")
-                resume_score = 0
-                if 'Objective' in resume_text:
-                    resume_score = resume_score+20
-                    #st.markdown('''<h4 style='text-align: left; color: #1ed760;'>[+] Awesome! You have added Objective</h4>''',unsafe_allow_html=True)
-                else:
-                    pass
-                    #st.markdown('''<h4 style='text-align: left; color: #fabc10;'>[-] According to our recommendation please add your career objective, it will give your career intension to the Recruiters.</h4>''',unsafe_allow_html=True)
-
-                if 'Declaration'  in resume_text:
-                    resume_score = resume_score + 20
-                    #st.markdown('''<h4 style='text-align: left; color: #1ed760;'>[+] Awesome! You have added Delcaration✍/h4>''',unsafe_allow_html=True)
-                else:
-                    pass
-                    #st.markdown('''<h4 style='text-align: left; color: #fabc10;'>[-] According to our recommendation please add Declaration✍. It will give the assurance that everything written on your resume is true and fully acknowledged by you</h4>''',unsafe_allow_html=True)
-
-                if 'Hobbies' or 'Interests'in resume_text:
-                    resume_score = resume_score + 20
-                    #st.markdown('''<h4 style='text-align: left; color: #1ed760;'>[+] Awesome! You have added your Hobbies⚽</h4>''',unsafe_allow_html=True)
-                else:
-                    pass
-                    #st.markdown('''<h4 style='text-align: left; color: #fabc10;'>[-] According to our recommendation please add Hobbies⚽. It will show your persnality to the Recruiters and give the assurance that you are fit for this role or not.</h4>''',unsafe_allow_html=True)
-
-                if 'Achievements' in resume_text:
-                    resume_score = resume_score + 20
-                    #st.markdown('''<h4 style='text-align: left; color: #1ed760;'>[+] Awesome! You have added your Achievements🏅 </h4>''',unsafe_allow_html=True)
-                else:
-                    pass
-                    #st.markdown('''<h4 style='text-align: left; color: #fabc10;'>[-] According to our recommendation please add Achievements🏅. It will show that you are capable for the required position.</h4>''',unsafe_allow_html=True)
-
-                if 'Projects' in resume_text:
-                    resume_score = resume_score + 20
-                    #st.markdown('''<h4 style='text-align: left; color: #1ed760;'>[+] Awesome! You have added your Projects👨‍💻 </h4>''',unsafe_allow_html=True)
-                else:
-                    pass
-                #st.markdown('''<h4 style='text-align: left; color: #fabc10;'>[-] According to our recommendation please add Projects👨‍💻. It will show that you have done work related the required position or not.</h4>''',unsafe_allow_html=True)
-
-                st.subheader("**Resume Score📝**")
-                st.markdown(
-                    """
-                    <style>
-                        .stProgress > div > div > div > div {
-                            background-color: #d73b5c;
-                        }
-                    </style>""",
-                    unsafe_allow_html=True,
-                )
-                my_bar = st.progress(0)
-                score = 0
-                for percent_complete in range(resume_score):
-                    score +=1
-                    time.sleep(0.1)
-                    my_bar.progress(percent_complete + 1)
-                st.success('** Your Resume Writing Score: ' + str(score)+'**')
-                st.warning("** Note: This score is calculated based on the content that you have added in your Resume. **")
-                st.balloons()
-
-                insert_data(resume_data['name'], resume_data['email'], str(resume_score), timestamp,
-                              str(resume_data['no_of_pages']), reco_field, cand_level, str(resume_data['skills']),
-                              str(recommended_skills), str(rec_course))
-        st_lottie(lottie_resume, height=1000, key="anime")
+def extract_cat_data(row):
+    
+    # 1. extract current/former employee flags from'Author Years'
+    if not pd.isna(row['Author Years']):
+        if "have been working" in row['Author Years']:
+            row['Current Employee'] = 1
+        elif "I worked at" in row['Author Years']:
+            row['Current Employee'] = 0
+        else:
+            row['Current Employee'] = Np.NaN          
+    
+    # 2. extract tenure from 'Author Years'
+    string_to_number = row["Author Years"].replace("a year", "1 year")  # replace 'a year' with '1 year'
+    tenure = re.findall(r'\d+', string_to_number)                       # find the digit in the string
+    
+    if tenure: 
+        row['Tenure'] = int(tenure[0])                 # use the number in the list
+        if 'more than' in row["Author Years"]:         
+            row['Tenure'] += 0.5                       # add 0.5 year if there is 'more than'
+        elif 'less than' in row["Author Years"]:       
+            row['Tenure'] -=0.5                        # minus 0.5 year if there is 'less than'
     else:
-        ## Admin Side
-        st.success('Welcome to Admin Side')
-        # st.sidebar.subheader('**ID / Password Required!**')
+        row['Tenure'] = np.NaN                         # if no tenure is specified, set to NaN
+    
+    
+     # 3. extract full-time/part-time flags from 'Author Years'
+    if 'full-time' in string_to_number or 'full time' in string_to_number:
+        row['Full-time'] = 1
+    elif 'part-time' in string_to_number or 'part time' in string_to_number:
+        row['Full-time'] = 0
+    else:
+        row['Full-time'] = np.NaN                       # if not specified, set it NaN
+ 
+    
+    # 4. extract 'Recommended','Positive Outlook','Approves of CEO' from column'Recommendation' 
+    row['Recommended'] = 0
+    row['Positive Outlook'] = 0
+    row['Approves of CEO'] = 0
+    
+    if not pd.isna(row['Recommendation']):
+        if 'Recommends' in row['Recommendation']:
+            row['Recommended'] = 1
+        elif "Doesn't Recommend" in row['Recommendation']:
+            row['Recommended'] = -1
+        
+        elif 'Positive Outlook' in row['Recommendation']:
+            row['Positive Outlook'] = 1
+        elif 'Negative Outlook' in row['Recommendation']:   
+            row['Positive Outlook'] = -1
+        elif 'Neutral Outlook' in row['Recommendation']: 
+            row['Positive Outlook'] = 0
+            
+        elif 'Approves of CEO' in row['Recommendation']:
+            row['Approves of CEO'] = 1
+        elif 'Disapproves of CEO' in row['Recommendation']:
+            row['Approves of CEO'] = -1
+        elif 'No opinion of CEO' in row['Recommendation']:   
+            row['Approves of CEO'] = 0
 
-        ad_user = st.text_input("Username")
-        ad_password = st.text_input("Password", type='password')
-        if st.button('Login'):
-            if ad_user == 'risedotcom' and ad_password == 'rise123':
-                st.success("Welcome Admin")
-                # Display Data
-                cursor.execute('''SELECT*FROM user_data''')
-                data = cursor.fetchall()
-                st.header("**User's👨‍💻 Data**")
-                df = pd.DataFrame(data, columns=['ID', 'Name', 'Email', 'Resume Score', 'Timestamp', 'Total Page',
-                                                 'Predicted Field', 'User Level', 'Actual Skills', 'Recommended Skills',
-                                                 'Recommended Course'])
-                st.dataframe(df)
-                st.markdown(get_table_download_link(df,'User_Data.csv','Download Report'), unsafe_allow_html=True)
-                ## Admin Side Data
-                query = 'select * from user_data;'
-                plot_data = pd.read_sql(query, connection)
+    return row
 
-                ## Pie chart for predicted field recommendations
-                labels = plot_data.Predicted_Field.unique()
-                print(labels)
-                values = plot_data.Predicted_Field.value_counts()
-                print(values)
-                st.subheader("📈 **Pie-Chart for Predicted Field Recommendations**")
-                fig = px.pie(df, values=values, names=labels, title='Predicted Field according to the Skills')
-                st.plotly_chart(fig)
+df_cat_extracted = df.apply(extract_cat_data, axis=1)
 
-                ### Pie chart for User's👨‍💻 Experienced Level
-                labels = plot_data.User_level.unique()
-                values = plot_data.User_level.value_counts()
-                st.subheader("📈 ** Pie-Chart for User's👨‍💻 Experienced Level**")
-                fig = px.pie(df, values=values, names=labels, title="Pie-Chart📈 for User's👨‍💻 Experienced Level")
-                st.plotly_chart(fig)
+def extract_loc_job(row):
+    
+    # 1. extract location
+    if not pd.isna(row['Author Location']):
+        if re.search(r'[A-Z]{2}$',row['Author Location']): 
+            # extract the last 2 captical letters as state
+            row['State'] = re.search(r'[A-Z]{2}$',row['Author Location'])[0]
+        else:
+            row['State'] = np.NaN      
+    else:
+            row['State'] = np.NaN                               
+    
+    # 2. extract job title
+    if pd.notnull(row['Author Title']) and row['Author Title']: 
+        if '-'in row['Author Title']:  # author title usually starts like this: "Current Employee - Analyst" 
+            row['Job Title'] = row['Author Title'].split("-")[1]  # get the 2nd element after the split 
+        else:
+            row['Job Title'] = row['Author Title']
+    else:
+         row['Job Title'] = 'Unknown Title'
+    # remove "senior" and "principal" to get fewer job categories 
+    # remove the beginning & end spaces
+    row['Job Title'] = row['Job Title'].replace('Senior',"").replace('Principal',"").strip() 
+    
+    return row       
+
+df_loc_job_filled = df_cat_extracted.apply(extract_loc_job,axis=1) 
+
+df_cleaned = df_loc_job_filled.drop(columns = ['Recommendation', 'Author Title', 'Author Years', 'Author Location'])
+
+df_cleaned = df_cleaned[['Comment Datetime', 'State', 'Job Title','Tenure','Current Employee','Full-time',
+                          'Summary','Pro','Con','Recommended', 'Positive Outlook','Approves of CEO',
+                          'Overall Rating','Career Opportunities','Compensation and Benefits',
+                          'Work/Life Balance','Senior Management','Culture & Values']]
+df_cleaned.set_index('Comment Datetime',inplace=True)
+df_cleaned = df_cleaned.sort_index()
 
 
-            else:
-                st.error("Wrong ID & Password Provided")
-run()
+
+st.markdown("## All Ratings")
+
+# plot all ratings using boxplots
+
+column_list = ['Overall Rating','Career Opportunities','Compensation and Benefits',
+            'Work/Life Balance','Senior Management','Culture & Values']
+
+figure, ax = plt.subplots(1,6,figsize=(12,5))  
+
+for column, curr_ax in zip(column_list, ax.ravel()):  # use ax.ravel() to flatten ax(2 by 3) in order to zip
+    curr_ax.boxplot(df_cleaned[column].dropna())      # drop those NaN values    
+    curr_ax.set_title(f'{column}')
+
+plt.tight_layout()
+st.pyplot(figure) 
+
+
+st.markdown("## Overall recommendations")
+
+rec_count = df_cleaned['Recommended'].value_counts(normalize=True)
+
+fig, ax = plt.subplots()
+ax.bar(['Recommend', 'Unknown','Not Recommend'], rec_count, color=['tab:olive','tab:orange','tab:red'])
+ax.set_title('Recommend Or Not?', fontsize=20)
+ax.set_ylabel('Frequency')
+# plt.savefig('recommend_or_not.png')
+
+st.pyplot(fig)
+
+# plot sub categories average ratings
+
+column_list = ['Overall Rating','Career Opportunities','Compensation and Benefits',
+               'Work/Life Balance','Senior Management','Culture & Values']
+
+sub_ratings = df_cleaned[column_list].mean()
+colors1=['tab:cyan','tab:orange','tab:red','tab:pink','tab:purple','tab:olive']
+
+figure_sc, ax = plt.subplots(figsize=(12,5))  
+ax.bar(sub_ratings.index, sub_ratings, color=colors1)
+
+ax.set_title ('Sub-categories Average Ratings', fontsize=20)
+ax.set_ylabel ('Average Ratings')
+ax.set_xticklabels(sub_ratings.index,rotation=45)
+# figure.savefig('subcategory_rating.png', bbox_inches = 'tight')
+st.pyplot(figure_sc)
+#plt.show() 
+
+# plot the 10 states with top ratings 
+
+top_10 = df_cleaned.groupby('State')['Overall Rating'].mean().nlargest(10)
+colors2 = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 
+           'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+
+fig,ax = plt.subplots(figsize=(10,5))
+ax.bar(top_10.index,top_10, color=colors2)
+ax.set_title('Top 10 States with Highest Ratings', fontsize=20)
+ax.set_xlabel('States')
+ax.set_ylabel('Overall rating')
+# plt.savefig('top10_states_high_rate.png')
+
+plt.show()
+
+# plot the 5 states with lowest ratings 
+
+lowest_5 = df_cleaned.groupby('State')['Overall Rating'].mean().nsmallest(5)
+colors3 = ['tab:blue','tab:pink','tab:cyan','tab:orange','tab:purple']
+
+fig,ax = plt.subplots(figsize=(10,5))
+ax.bar(lowest_5.index,lowest_5, color=colors3)
+ax.set_title('Top 5 States with Lowest Ratings',fontsize=20)
+ax.set_xlabel('States')
+ax.set_ylabel('Overall rating')
+# plt.savefig('top5_states_low_rate.png')
+
+plt.show()
+
+# plot overall rating by full-time/part-time employee
+
+rate_by_fte = df_cleaned.groupby('Full-time')['Overall Rating'].mean()
+
+fig_fte, ax = plt.subplots()
+ax.bar(['Part_Time', 'Full_Time'], rate_by_fte,color=['tab:pink','tab:cyan'])
+ax.set_title('Overall Ratings by Full/Part-time Employee', fontsize=20)
+ax.set_ylabel('Overall rating')
+# plt.savefig('rating_by_fulltime_parttime.png')
+
+st.pyplot(fig_fte)
+
+# plot overall rating by current/former employee
+
+rate_by_emp_type = df_cleaned.groupby('Current Employee')['Overall Rating'].mean()
+
+fig_emptype, ax = plt.subplots()
+ax.bar(['Former Employee', 'Current Employee'], rate_by_emp_type,color=['tab:pink','tab:cyan'])
+ax.set_title('Overall Ratings by Current/Former Employee', fontsize=20)
+ax.set_ylabel('Overall rating')
+# plt.savefig('rating_by_current_former.png')
+
+st.pyplot(fig_emptype)
+# plot the most frenquest reviewer job titles
+
+top_20_job = df_cleaned['Job Title'].value_counts().nlargest(20)
+
+top_20 = plt.figure(figsize=(12,7))
+sns.countplot(y='Job Title',data=df_cleaned, order=top_20_job.index)
+sns.set_context('talk')
+plt.title('Most Frequest Employee Job Titles', fontsize=20)
+# figure.savefig('most_freq_job_title.png',bbox_inches = 'tight')
+
+st.pyplot(top_20)
+
+top_20job_review = df_cleaned.loc[df_cleaned['Job Title'].isin(top_20_job.index), ['Job Title','Overall Rating']]
+top_20job_mean_review = top_20job_review.groupby('Job Title')['Overall Rating'].mean().sort_values(ascending = False)
+
+# plot the reviewers in the top 20 job families' overall rating
+
+job_family = plt.figure(figsize=(12,7))
+sns.barplot(y=top_20job_mean_review.index, x=top_20job_mean_review, hue_order=top_20job_mean_review)
+sns.set_context('talk')
+plt.title('Overall Rating by Job Family', fontsize=20)
+# figure.savefig('rating_by_job_family.png',bbox_inches = 'tight')
+
+st.pyplot(job_family)
+
+df_cleaned.to_csv('df_cleaned1.csv')
+df_cleaned = pd.read_csv('df_cleaned.csv')
+def get_common_words(column,n):
+    text = df_cleaned[column].to_string()
+    tokens = [w for w in word_tokenize(text.lower()) if w.isalpha()]
+    no_stops = [t for t in tokens if t not in stopwords.words('english')]
+    top_n = Counter(no_stops).most_common(n)
+    
+    return top_n
+top_20_summary = get_common_words('Summary',20)
+top_20_pro = get_common_words('Pro',20)
+top_20_con = get_common_words('Con',20)
+stop_words = set(stopwords.words("english"))
+cus_words = ["work", "place", "anonymous","anonymou","they","there"]
+stop_words = stop_words.union(cus_words)
+def plot_wordcloud(column):
+    text = df_cleaned[column].to_string().lower()
+    wordcloud = WordCloud(background_color='white',
+                          stopwords = stop_words,
+                          max_words=100,
+                          max_font_size=50, 
+                          random_state=42).generate(text)
+
+    wc = plt.figure(figsize=(10,10))
+    plt.imshow(wordcloud)
+    plt.axis('off')
+    plt.title(column, fontsize=20)
+    st.pyplot(wc)
